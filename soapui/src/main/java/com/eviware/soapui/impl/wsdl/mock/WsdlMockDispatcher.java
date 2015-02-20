@@ -79,7 +79,7 @@ public class WsdlMockDispatcher extends AbstractMockDispatcher
 			{
 				WsdlDefinitionExporter exporter = new WsdlDefinitionExporter( ( WsdlInterface )iface );
 
-				String wsdlPrefix = trimLastSlash( getInterfacePrefix( iface ) );
+				String wsdlPrefix = trimLastSlash( getInterfacePrefix( null, iface ) );
 				StringToStringMap parts = exporter.createFilesForExport( wsdlPrefix + "&part=" );
 
 				for( Map.Entry<String, String> partEntry : parts.entrySet() )
@@ -97,7 +97,7 @@ public class WsdlMockDispatcher extends AbstractMockDispatcher
 
 				wsdlCache.put( iface.getName(), parts );
 
-				log.info( "Mounted WSDL for interface [" + iface.getName() + "] at [" + getOverviewUrl() + "]" );
+				log.info( "Mounted WSDL for interface [" + iface.getName() + "] at [" + getOverviewUrl(null) + "]" );
 			}
 			catch( Exception e )
 			{
@@ -305,7 +305,7 @@ public class WsdlMockDispatcher extends AbstractMockDispatcher
 	{
 		if( request.getQueryString().equalsIgnoreCase( "WSDL" ) )
 		{
-			printWsdl( response );
+			printWsdl( request, response );
 			return;
 		}
 
@@ -313,7 +313,7 @@ public class WsdlMockDispatcher extends AbstractMockDispatcher
 		WsdlInterface iface = ( WsdlInterface )mockService.getProject().getInterfaceByName( ifaceName );
 		if( iface == null )
 		{
-			printInterfaceList( response );
+			printInterfaceList( request, response );
 			return;
 		}
 
@@ -323,7 +323,7 @@ public class WsdlMockDispatcher extends AbstractMockDispatcher
 
 		if( content == null )
 		{
-			printPartList( iface, parts, response );
+			printPartList( iface, parts, request, response );
 			return;
 		}
 
@@ -340,7 +340,7 @@ public class WsdlMockDispatcher extends AbstractMockDispatcher
 		mockContext.clear();
 	}
 
-	public void printWsdl( HttpServletResponse response ) throws IOException
+	public void printWsdl( HttpServletRequest request, HttpServletResponse response ) throws IOException
 	{
 		WsdlInterface[] mockedInterfaces = mockService.getMockedInterfaces();
 		if( mockedInterfaces.length == 1 )
@@ -358,7 +358,7 @@ public class WsdlMockDispatcher extends AbstractMockDispatcher
 				{
 					StringToStringMap parts = wsdlCache.get( iface.getName() );
 					Import wsdlImport = def.createImport();
-					wsdlImport.setLocationURI( getInterfacePrefix( iface ) + "&part=" + parts.get( "#root#" ) );
+					wsdlImport.setLocationURI( getInterfacePrefix( request, iface ) + "&part=" + parts.get( "#root#" ) );
 					wsdlImport.setNamespaceURI( WsdlUtils.getTargetNamespace( iface.getWsdlContext().getDefinition() ) );
 
 					def.addImport( wsdlImport );
@@ -388,7 +388,7 @@ public class WsdlMockDispatcher extends AbstractMockDispatcher
 	}
 
 
-	public void printPartList( WsdlInterface iface, StringToStringMap parts, HttpServletResponse response )
+	public void printPartList( WsdlInterface iface, StringToStringMap parts, HttpServletRequest request, HttpServletResponse response )
 			throws IOException
 	{
 		response.setStatus( HttpServletResponse.SC_OK );
@@ -403,14 +403,14 @@ public class WsdlMockDispatcher extends AbstractMockDispatcher
 				continue;
 
 			out.print( "<li><a href=\"" );
-			out.print( getInterfacePrefix( iface ) + "&part=" + key );
+			out.print( getInterfacePrefix( request, iface ) + "&part=" + key );
 			out.print( "\">" + key + "</a></li>" );
 		}
 
 		out.print( "</ul></p></body></html>" );
 	}
 
-	public void printInterfaceList( HttpServletResponse response ) throws IOException
+	public void printInterfaceList( HttpServletRequest request, HttpServletResponse response ) throws IOException
 	{
 		response.setStatus( HttpServletResponse.SC_OK );
 		response.setContentType( "text/html" );
@@ -421,7 +421,7 @@ public class WsdlMockDispatcher extends AbstractMockDispatcher
 		for( Interface iface : ModelSupport.getChildren( mockService.getProject(), WsdlInterface.class ) )
 		{
 			out.print( "<li><a href=\"" );
-			out.print( getInterfacePrefix( iface ) );
+			out.print( getInterfacePrefix( request, iface ) );
 			out.print( "\">" + iface.getName() + "</a></li>" );
 		}
 
@@ -439,15 +439,21 @@ public class WsdlMockDispatcher extends AbstractMockDispatcher
 		in.close();
 	}
 
-	public String getInterfacePrefix( Interface iface )
+	public String getInterfacePrefix( HttpServletRequest request, Interface iface )
 	{
-		String wsdlPrefix = getOverviewUrl() + "&interface=" + iface.getName();
+		String wsdlPrefix = getOverviewUrl(request) + "&interface=" + iface.getName();
 		return wsdlPrefix;
 	}
 
-	public String getOverviewUrl()
+	public String getOverviewUrl(HttpServletRequest request )
 	{
-		return mockService.getPath() + "?WSDL";
+        String overviewUrl;
+        if (request != null) {
+            overviewUrl = request.getContextPath() + mockService.getPath() + "?WSDL";
+        } else {
+            overviewUrl = mockService.getPath() + "?WSDL";
+        }
+        return overviewUrl;
 	}
 
 	private String trimLastSlash( String wsdlPrefix )
